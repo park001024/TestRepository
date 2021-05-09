@@ -93,6 +93,12 @@ struct thread
     /* added for HW1 */
     int64_t sleep_tick;
 
+		/* added for HW2 */
+		int origin_priority;
+		struct list donators;
+		struct lock *lock_need;
+		struct list_elem donate_thread;
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -146,5 +152,12 @@ void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t ticks);
 void find_earliest(int64_t ticks);
 int64_t get_earliest(void);
+
+/* added for HW2 */
+bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, void *aux);
+void check_priority(void);
+void donate_priority(void);
+void donator_release(struct lock *lock);
+void renew_priority(void);
 
 #endif /* threads/thread.h */
