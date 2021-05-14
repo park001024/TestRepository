@@ -262,7 +262,7 @@ lock_release (struct lock *lock)
   lock->holder = NULL;
 
 	/* added for HW2 */
-	/* adjusted for HWextra  */
+	/* adjusted for HWextra */
 	if (!thread_mlfqs){
 		donator_release(lock);
 		refresh_priority();

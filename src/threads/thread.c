@@ -424,7 +424,7 @@ donate_priority (void)
 	}
 }
 
-/* added for HW2*/
+/* added for HW2 */
 void
 donator_release (struct lock *lock)
 {
@@ -518,9 +518,9 @@ void
 thread_set_nice (int nice) 
 {
   /* added for HWextra */
-	//intr_disable();
+	intr_disable();
 	thread_current()->nice = nice;
-	//intr_enable();
+	intr_enable();
 }
 
 /* Returns the current thread's nice value. */
@@ -528,9 +528,9 @@ int
 thread_get_nice (void) 
 {
   /* added for HWextra */
-	//intr_disable();
+	intr_disable();
 	int nice = thread_current()->nice;
-	//intr_enable();
+	intr_enable();
   return nice;
 }
 
@@ -552,9 +552,9 @@ thread_get_recent_cpu (void)
 {
   /* added for HWextra */
 	int int_used;
-	//intr_disable();
+	intr_disable();
 	int_used = fp_to_int_round(fp_mux_int(thread_current()->recent_cpu, 100));
-	//intr_enable();
+	intr_enable();
 	return int_used;
 }
 
