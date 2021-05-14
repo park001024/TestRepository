@@ -589,7 +589,21 @@ void
 mlfqs_priority(struct thread *t)
 {
 	if (t != idle_thread)
-		t->priority =fp_sub(fp_sub(int_to_fp(PRI_MAX), fp_div_int(t->recent_cpu, 4)), fp_mux_int(int_to_fp(t->nice), 2));
+		t->priority = fp_sub(fp_sub(int_to_fp(PRI_MAX), fp_div_int(t->recent_cpu, 4)), fp_mux_int(int_to_fp(t->nice), 2));
+}
+
+/* added for HWextra */
+void
+mlfqs_refresh_priority(void)
+{
+	struct list_elem *e = list_begin(&all_list);
+	struct thread *t;
+	while(e != list_end(&all_list)){
+		t = list_entry(e, struct thread, allelem);
+		if (t != idle_thread)
+			t->priority = fp_sub(fp_sub(int_to_fp(PRI_MAX), fp_div_int(t->recent_cpu, 4)), fp_mux_int(int_to_fp(t->nice), 2));
+		e = list_next(e);
+	}
 }
 
 /* added for HWextra */

@@ -180,7 +180,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
 	if (thread_mlfqs){
 		mlfqs_increase_cpu();
 		if (ticks % 4 == 0)
-			mlfqs_priority(thread_current());
+			mlfqs_refresh_priority();
 
 		if (timer_ticks() % TIMER_FREQ == 0)
 			mlfqs_refresh();
