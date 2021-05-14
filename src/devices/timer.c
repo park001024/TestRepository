@@ -175,10 +175,20 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+	
+	/* added for HWextra */
+	if (thread_mlfqs){
+		mlfqs_increase_cpu();
+		if (ticks % 4 == 0)
+			mlfqs_priority(thread_current());
 
-  /* added for HW1 */
-  if (get_earliest() <= ticks)
-    thread_wakeup(ticks);
+		if (timer_ticks() % TIMER_FREQ == 0)
+			mlfqs_refresh();
+	}
+
+	/* added for HW1 */
+	if (get_earliest() <= ticks)
+		thread_wakeup(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

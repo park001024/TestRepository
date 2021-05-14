@@ -115,7 +115,8 @@ sema_up (struct semaphore *sema)
 
   ASSERT (sema != NULL);
 
-  old_level = intr_disable ();
+	old_level = intr_disable ();
+
   if (!list_empty (&sema->waiters)){
 		/* added for HW2 */
 		list_sort(&sema->waiters, compare_priority, 0);
@@ -209,11 +210,14 @@ lock_acquire (struct lock *lock)
   ASSERT (!lock_held_by_current_thread (lock));
 
 	/* added for HW2 */
+	/* adjusted for HWextra */
 	struct thread *cur = thread_current();
-	if (lock->holder != NULL){
-		cur->lock_need = lock;
-		list_push_back(&lock->holder->donators, &cur->donate_thread);
-		donate_priority();
+	if (!thread_mlfqs){
+		if (lock->holder != NULL){
+			cur->lock_need = lock;
+			list_push_back(&lock->holder->donators, &cur->donate_thread);
+			donate_priority();
+		}
 	}
 
   sema_down (&lock->semaphore);
@@ -258,9 +262,13 @@ lock_release (struct lock *lock)
   lock->holder = NULL;
 
 	/* added for HW2 */
-	donator_release(lock);
-	renew_priority();
+	/* adjusted for HWextra  */
+	if (!thread_mlfqs){
+		donator_release(lock);
+		refresh_priority();
+	}
 
+	
   sema_up (&lock->semaphore);
 }
 

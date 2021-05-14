@@ -15,6 +15,9 @@
 #include "userprog/process.h"
 #endif
 
+/* added for HWextra */
+#include "floating_point.h"
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -31,6 +34,9 @@ static struct list all_list;
 /* added for HW1 */
 static struct list sleep_list;
 static int64_t earliest_tick;
+
+/* added for HWextra */
+static int load_avg = 0;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -105,6 +111,10 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+	/* added for HWextra */
+	initial_thread->nice = 0;
+	initial_thread->recent_cpu = 0;
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -431,7 +441,7 @@ donator_release (struct lock *lock)
 
 /* added for HW2 */
 void
-renew_priority (void)
+refresh_priority (void)
 {
 	struct thread *cur = thread_current();
 	cur->priority = cur->origin_priority;
@@ -485,10 +495,14 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+	/* added for HWextra */
+	if (thread_mlfqs)
+		return;
+
 	/* adjusted for HW2 */
   // thread_current ()->priority = new_priority;
 	thread_current()->origin_priority = new_priority;
-	renew_priority();
+	refresh_priority();
 	check_priority();
 }
 
@@ -501,34 +515,98 @@ thread_get_priority (void)
 
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int nice) 
 {
-  /* Not yet implemented. */
+  /* added for HWextra */
+	//intr_disable();
+	thread_current()->nice = nice;
+	//intr_enable();
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  /* added for HWextra */
+	//intr_disable();
+	int nice = thread_current()->nice;
+	//intr_enable();
+  return nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  /* added for HWextra */
+	int int_avg;
+	intr_disable();
+  int_avg = fp_to_int_round(fp_mux_int(load_avg, 100));
+	intr_enable();
+	return int_avg;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  /* added for HWextra */
+	int int_used;
+	//intr_disable();
+	int_used = fp_to_int_round(fp_mux_int(thread_current()->recent_cpu, 100));
+	//intr_enable();
+	return int_used;
 }
+
+/* added for HWextra */
+void
+mlfqs_increase_cpu(void)
+{
+	if (thread_current() != idle_thread)
+		thread_current()->recent_cpu = fp_add_int(thread_current()->recent_cpu, 1);
+}
+
+/* added for HWextra */
+void
+mlfqs_load_avg(void)
+{
+	int num_ready = list_size(&ready_list);
+	if (thread_current() != idle_thread)
+		num_ready++;
+	load_avg = fp_add(fp_mux(fp_div_int(int_to_fp(59), 60), load_avg), fp_mux_int(fp_div_int(int_to_fp(1), 60), num_ready));
+}
+
+/* added for HWextra */
+void
+mlfqs_recent_cpu(struct thread *t)
+{
+	if (t != idle_thread)
+		t->recent_cpu = fp_add_int(fp_mux(fp_div(fp_mux_int(load_avg, 2), fp_add_int(fp_mux_int(load_avg, 2), 1)), t->recent_cpu), t->nice);
+}
+
+/* added for HWextra */
+void
+mlfqs_priority(struct thread *t)
+{
+	if (t != idle_thread)
+		t->priority =fp_sub(fp_sub(int_to_fp(PRI_MAX), fp_div_int(t->recent_cpu, 4)), fp_mux_int(int_to_fp(t->nice), 2));
+}
+
+/* added for HWextra */
+void
+mlfqs_refresh(void)
+{
+	mlfqs_load_avg();
+	struct list_elem *e = list_begin(&all_list);
+	struct thread *t;
+	while(e != list_end(&all_list)){
+		t = list_entry(e, struct thread, allelem);
+		mlfqs_recent_cpu(t);
+		mlfqs_priority(t);
+		e = list_next(e);
+	}
+}
+
 
 /* Idle thread.  Executes when no other thread is ready to run.
 
@@ -620,6 +698,10 @@ init_thread (struct thread *t, const char *name, int priority)
 	t->origin_priority = priority;
 	list_init(&t->donators);
 	t->lock_need = NULL;
+
+	/* added for HWextra */
+	t->nice = running_thread()->nice;
+	t->recent_cpu = running_thread()->recent_cpu;
 
 	list_push_back (&all_list, &t->allelem);
 }

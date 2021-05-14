@@ -99,6 +99,10 @@ struct thread
 		struct lock *lock_need;
 		struct list_elem donate_thread;
 
+		/* added for HWextra */
+		int nice;
+		int recent_cpu;
+
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -158,6 +162,10 @@ bool compare_priority(const struct list_elem *e1, const struct list_elem *e2, vo
 void check_priority(void);
 void donate_priority(void);
 void donator_release(struct lock *lock);
-void renew_priority(void);
+void refresh_priority(void);
+
+/* added for HWextra */
+void mlfqs_increase_cpu(void);
+void mlfqs_priority(struct thread *t);
 
 #endif /* threads/thread.h */
