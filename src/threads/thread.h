@@ -4,6 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+/* added for HW3 */
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -109,6 +111,16 @@ struct thread
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+		/* added for HW3 */
+		struct semaphore child_lock;
+		struct semaphore exit_lock;
+		struct semaphore parent_lock;
+		struct thread *parent;
+		struct list child;
+		struct list_elem child_elem;
+		int exit_status;
+		struct file *fd[128];
+		int not_pass;
 #endif
 
     /* Owned by thread.c. */

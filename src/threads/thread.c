@@ -718,6 +718,22 @@ init_thread (struct thread *t, const char *name, int priority)
 	t->recent_cpu = running_thread()->recent_cpu;
 
 	list_push_back (&all_list, &t->allelem);
+
+	/* added for HW3 */
+#ifdef USERPROG
+	sema_init(&t->child_lock, 0);
+	sema_init(&t->exit_lock, 0);
+	sema_init(&t->parent_lock, 0);
+	t->parent = running_thread();
+	list_init(&(t->child));
+	list_push_back(&(running_thread()->child), &(t->child_elem));
+	int i;
+	for (i = 0; i < 128; i++){
+		t->fd[i] = NULL;
+	}
+	t->not_pass = 0;
+#endif
+
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

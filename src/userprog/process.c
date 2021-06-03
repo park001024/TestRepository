@@ -31,6 +31,11 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
 
+	/* added for HW3 */
+	char real_name[256];
+	struct list_elem *e;
+	struct thread *t;
+	
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -38,11 +43,94 @@ process_execute (const char *file_name)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
 
+	/* adjusted for HW3 */
+	int i;
+	for (i = 0; file_name[i] != '\0' && file_name[i] != ' '; i++){
+		real_name[i] = file_name[i];
+	}
+	real_name[i] = '\0';
+	if (filesys_open(real_name) == NULL){
+		return -1;
+	}
+	tid = thread_create (real_name, PRI_DEFAULT, start_process, fn_copy);
+	sema_down(&thread_current()->parent_lock);
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
+  // tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+  
+	if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
-  return tid;
+  
+	/* added for HW3 */
+	for (e = list_begin(&thread_current()->child); e != list_end(&thread_current()->child); e = list_next(e)){
+		t = list_entry(e, struct thread, child_elem);
+		if (t->not_pass == 1){
+			return process_wait(tid);
+		}
+	}
+
+	return tid;
+}
+
+/* added for HW3 */
+void
+set_esp (char *file_name, void **esp)
+{
+	char **argv;
+	int argc;
+	char temp_name[256];
+	char *token;
+	char *next;
+	int i;
+	int len;
+	int len_sum;
+
+	strlcpy(temp_name, file_name, strlen(file_name) + 1);
+	token = strtok_r(temp_name, " ", &next);
+	argc = 0;
+
+	while(token != NULL){
+		argc++;
+		token = strtok_r(NULL, " ", &next);
+	}
+	argv = (char **)malloc(sizeof(char *) * argc);
+
+	strlcpy(temp_name, file_name, strlen(file_name) + 1);
+	for (i = 0, token = strtok_r(temp_name, " ", &next); i < argc; i++, token = strtok_r(NULL, " ", &next)){
+		len = strlen(token);
+		argv[i] = token;
+	}
+
+	len_sum = 0;
+	for (i = argc - 1; i >= 0; i--){
+		len = strlen(argv[i]);
+		*esp -= len + 1;
+		strlcpy(*esp, argv[i], len + 1);
+		argv[i] = *esp;
+		len_sum += len + 1;
+	}
+
+	if (len_sum % 4 != 0){
+		*esp -= (4 - (len_sum % 4));
+	}
+
+	*esp -= 4;
+	**(uint32_t **)esp = 0;
+
+	for (i = argc - 1; i >= 0; i--){
+		*esp -= 4;
+		**(uint32_t **)esp = argv[i];
+	}
+
+	*esp -= 4;
+	**(uint32_t **)esp = *esp + 4;
+
+	*esp -= 4;
+	**(uint32_t **)esp = argc;
+
+	*esp -= 4;
+	**(uint32_t **)esp = 0;
+
+	free(argv);
 }
 
 /* A thread function that loads a user process and starts it
@@ -54,17 +142,38 @@ start_process (void *file_name_)
   struct intr_frame if_;
   bool success;
 
+	/* added for HW3 */
+	char real_name[256];
+	int i;
+	for (i = 0; file_name[i] != '\0' && file_name[i] != ' '; i++){
+		real_name[i] = file_name[i];
+	}
+	real_name[i] = '\0';
+
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  success = load (file_name, &if_.eip, &if_.esp);
+  /* adjusted for HW3 */
+	// success = load (file_name, &if_.eip, &if_.esp);
+	success = load (real_name, &if_.eip, &if_.esp);
+
+	/*added for HW3 */
+	if (success){
+		set_esp(file_name, &if_.esp);
+	}
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
-    thread_exit ();
+
+	/* adjusted for HW3 */
+	sema_up(&thread_current()->parent->parent_lock);
+  if (!success){
+		thread_current()->not_pass = 1;
+		exit(-1);
+    //thread_exit ();
+	}
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -79,15 +188,30 @@ start_process (void *file_name_)
 /* Waits for thread TID to die and returns its exit status.  If
    it was terminated by the kernel (i.e. killed due to an
    exception), returns -1.  If TID is invalid or if it was not a
-   child of the calling process, or if process_wait() has already
+   child of the calling p_rocess, or if process_wait() has already
    been successfully called for the given TID, returns -1
    immediately, without waiting.
 
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
+	/* added for HW3 */
+	struct list_elem *e;
+	struct thread *t;
+	int exit_status;
+	for (e = list_begin(&(thread_current()->child)); e != list_end(&(thread_current()->child)); e = list_next(e)){
+		t = list_entry(e, struct thread, child_elem);
+		if (child_tid == t->tid){
+			sema_down(&(t->child_lock));
+			exit_status = t->exit_status;
+			list_remove(&(t->child_elem));
+			sema_up(&(t->exit_lock));
+			return exit_status;
+		}
+	}
+
   return -1;
 }
 
@@ -114,6 +238,9 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+	/* added for HW3 */
+	sema_up(&(cur->child_lock));
+	sema_down(&(cur->exit_lock));
 }
 
 /* Sets up the CPU for running user code in the current
@@ -358,7 +485,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
      it then user code that passed a null pointer to system calls
      could quite likely panic the kernel by way of null pointer
      assertions in memcpy(), etc. */
-  if (phdr->p_vaddr < PGSIZE)
+	if (phdr->p_vaddr < PGSIZE)
     return false;
 
   /* It's okay. */
